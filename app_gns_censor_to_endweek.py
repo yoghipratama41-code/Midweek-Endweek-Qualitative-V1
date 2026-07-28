@@ -17,7 +17,7 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request as GoogleAuthRequest
 
 # ==========================================
-# 0. KONFIGURASI
+# 0. CONFIGURATION
 # ==========================================
 st.set_page_config(page_title="GNS Censor -> Endweek", layout="wide")
 
@@ -263,7 +263,7 @@ MAX_RETRY_PER_MODEL = 3
 
 
 # ==========================================
-# 1. AUTH GOOGLE
+# 1. GOOGLE AUTH
 # ==========================================
 @st.cache_resource(ttl=1800)
 def get_creds():
@@ -285,8 +285,8 @@ def load_ocr_reader():
 
 
 # ==========================================
-# 2. GEMINI — SATU FUNGSI FALLBACK DIPAKAI UNTUK SEMUA PANGGILAN AI
-#    (identifikasi nama utk sensor, MAUPUN analisis title/context/insight)
+# 2. GEMINI - SINGLE FALLBACK FUNCTION USED FOR ALL AI CALLS
+#    (name identification for censoring, AND title/context/insight analysis)
 # ==========================================
 def get_model_fallback_list():
     available = [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]
@@ -301,7 +301,7 @@ def get_model_fallback_list():
 
 
 def panggil_gemini_fallback(model_names, prompt, gambar_list, status_box, max_retry_per_model=MAX_RETRY_PER_MODEL):
-    """Kirim prompt+gambar ke Gemini. Retry dengan backoff kalau limit, pindah model kalau tetap gagal."""
+    """Send prompt+images to Gemini. Retry with backoff on rate limit, switch model if it keeps failing."""
     last_err = None
     for model_name in model_names:
         model = genai.GenerativeModel(model_name)
@@ -319,30 +319,30 @@ def panggil_gemini_fallback(model_names, prompt, gambar_list, status_box, max_re
                 if "429" in err_msg or "503" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
                     wait_time = delay + random.uniform(0, 5)
                     status_box.warning(
-                        f"Model **{nama_model_pendek}** kena limit/sibuk "
-                        f"(percobaan {attempt + 1}/{max_retry_per_model}). Menunggu {wait_time:.1f}s..."
+                        f"Model **{nama_model_pendek}** hit a rate limit/is busy "
+                        f"(attempt {attempt + 1}/{max_retry_per_model}). Waiting {wait_time:.1f}s..."
                     )
                     time.sleep(wait_time)
                     delay *= 2
                 else:
                     status_box.warning(f"Model **{nama_model_pendek}** error: {err_msg[:150]}")
                     break
-        status_box.info(f"Pindah dari model **{nama_model_pendek}** ke model berikutnya...")
-    raise Exception(f"Semua model gagal dicoba. Error terakhir: {last_err}")
+        status_box.info(f"Switching from model **{nama_model_pendek}** to the next model...")
+    raise Exception(f"All models failed. Last error: {last_err}")
 
 
 # ==========================================
-# 3. TAHAP SENSOR (Gemini identifikasi nama + EasyOCR lokasi pixel)
+# 3. CENSOR STAGE (Gemini identifies names + EasyOCR finds pixel location)
 # ==========================================
 AIM_PROMPT = """
-Analisis gambar tangkapan layar media sosial ini (bisa berupa postingan utama, caption, ATAU komentar).
-Fokus pada SEMUA NAMA PENGGUNA (username/account name) yang dicetak TEBAL (BOLD) di mana pun posisinya di gambar ini —
-baik itu nama yang memposting konten utama, maupun nama-nama akun pada tiap komentar.
-Jangan mengambil nama yang hanya disebut/di-mention di dalam ISI teks komentar atau caption (bukan nama akun itu sendiri).
+Analyze this social media screenshot (it could be a main post, a caption, OR a comment).
+Focus on ALL USERNAMES (account names) printed in BOLD, wherever they appear in this image —
+whether it's the name that posted the main content, or the account names on each comment.
+Do NOT pick up names that are only mentioned/tagged within the body text of a comment or caption (not the account name itself).
 
-Kembalikan hasilnya dalam format JSON murni, tanpa teks penjelasan, tanpa markdown.
-JSON harus berupa array of string, urut dari atas ke bawah gambar. Kalau tidak ada nama akun yang terlihat, kembalikan array kosong [].
-Contoh:
+Return the result in pure JSON format, with no explanatory text and no markdown.
+The JSON must be an array of strings, ordered from the top to the bottom of the image. If no account names are visible, return an empty array [].
+Example:
 ["See Toh Kwai Leng", "Pengkok Lim", "Mat Ken"]
 """
 
@@ -403,12 +403,12 @@ def apply_censor_pixel_boxes(image_pil, boxes, pad_ukuran, offset_y):
     draw = PIL.ImageDraw.Draw(censored_image)
     for (x1, y1, x2, y2) in boxes:
         y1_adj, y2_adj = y1 + offset_y, y2 + offset_y
-        draw.rectangle([x1 - pad_ukuran, y1_adj - pad_ukuran, x2 + pad_ukuran, y2_adj + pad_ukuran], fill="black")
+        draw.rectangle([x1 - pad_ukuran, y1_adj - pad_ukuran, x2 + pad_ukuran, y2_adj + pad_ukuran], fill="#FFFFFF")
     return censored_image
 
 
 def sensor_satu_gambar(uploaded_file, model_fallback_list, reader, match_threshold, pad_ukuran, offset_y, status_box):
-    """Jalankan pipeline sensor untuk satu file upload, return (image_asli, image_disensor, name_list, unmatched_names)."""
+    """Run the censor pipeline for a single uploaded file, return (original_image, censored_image, name_list, unmatched_names)."""
     image = PIL.Image.open(uploaded_file).convert("RGB")
     response_text, model_dipakai = panggil_gemini_fallback(model_fallback_list, AIM_PROMPT, [image], status_box)
     json_clean = response_text.replace("```json", "").replace("```", "").strip()
@@ -429,7 +429,7 @@ def sensor_satu_gambar(uploaded_file, model_fallback_list, reader, match_thresho
 
 
 # ==========================================
-# 4. TAHAP ENDWEEK (analisis AI atas gambar yg SUDAH disensor + upload Drive + generate slide)
+# 4. ENDWEEK STAGE (AI analysis on already-censored images + Drive upload + slide generation)
 # ==========================================
 PROMPT_ANALISIS = """
 Analyze this image (and comments if any) for a professional research slide.
@@ -450,7 +450,7 @@ Output Format:
 
 
 def upload_pil_ke_drive(drive_service, pil_image, filename):
-    """Upload PIL image (yang sudah disensor) ke Drive sebagai PNG, kembalikan link publik."""
+    """Upload a PIL image (already censored) to Drive as PNG, return the public link."""
     buf = io.BytesIO()
     pil_image.save(buf, format="PNG")
     buf.seek(0)
@@ -521,7 +521,7 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
     presentation = slides_service.presentations().get(presentationId=id_slide_baru).execute()
     id_templat_main, id_templat_comment, id_templat_summary = cari_template_slide(presentation)
     if not id_templat_main:
-        raise Exception("Template Midweek tidak ditemukan! Pastikan ada slide berisi placeholder '{{IMG}}'.")
+        raise Exception("Midweek template not found! Make sure there is a slide containing the '{{IMG}}' placeholder.")
 
     all_titles = []
 
@@ -534,7 +534,7 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
     for index, item in enumerate(censored_items):
         fname = item["filename"]
         try:
-            status_box.info(f"[{index+1}/{jumlah}] Memproses Midweek: {fname}...")
+            status_box.info(f"[{index+1}/{jumlah}] Processing Midweek: {fname}...")
 
             gambar_list = [item["img_main_pil"]]
             if item.get("img_cmt_pil") is not None:
@@ -609,13 +609,13 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
                 time.sleep(15)
 
         except Exception as e:
-            status_box.error(f"{fname} dilewati: {e}")
+            status_box.error(f"{fname} skipped: {e}")
         finally:
             progress_bar.progress((index + 1) / jumlah)
 
     if id_templat_summary and all_titles:
         try:
-            status_box.info("Mengisi ringkasan judul di slide cover...")
+            status_box.info("Filling in the title summary on the cover slide...")
             ringkasan_judul = "\n".join(all_titles)
             slides_service.presentations().batchUpdate(
                 presentationId=id_slide_baru,
@@ -628,20 +628,20 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
                 ]},
             ).execute()
         except Exception as summary_err:
-            status_box.error(f"Gagal mengisi ringkasan judul di cover slide: {summary_err}")
+            status_box.error(f"Failed to fill in the title summary on the cover slide: {summary_err}")
 
     if sheets_append_data:
         try:
-            status_box.info("Mengirim data (Title & Kalimat Pertama) ke Spreadsheet...")
+            status_box.info("Sending data (Title & First Sentence) to Spreadsheet...")
             sheets_service.spreadsheets().values().append(
                 spreadsheetId=TARGET_SPREADSHEET_ID,
                 range=TARGET_SHEET_RANGE,
                 valueInputOption="USER_ENTERED",
                 body={"values": sheets_append_data},
             ).execute()
-            status_box.success("Data berhasil ditambahkan ke Spreadsheet!")
+            status_box.success("Data successfully added to Spreadsheet!")
         except Exception as sheet_err:
-            status_box.error(f"Slide Midweek sukses, namun gagal menambahkan ke Spreadsheet: {sheet_err}")
+            status_box.error(f"Midweek slide succeeded, but failed to add to Spreadsheet: {sheet_err}")
 
     return link_presentasi, processed_data
 
@@ -661,14 +661,14 @@ def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
     id_fb_main, id_fb_comment, id_promo_main = cari_template_slide_endweek(presentation)
 
     if not id_fb_main or not id_promo_main:
-        raise Exception("Template Endweek tidak lengkap! Pastikan ada slide ber-teks 'Facebook Group' & 'Promotion'.")
+        raise Exception("Endweek template is incomplete! Make sure there is a slide with the text 'Facebook Group' & 'Promotion'.")
 
     slide_count = len(presentation.get("slides", []))
 
     for item in processed_data:
         fname = item["filename"]
         format_pilihan = selections[fname]
-        status_box.info(f"Memproses Endweek: {fname} sebagai {format_pilihan}...")
+        status_box.info(f"Processing Endweek: {fname} as {format_pilihan}...")
 
         judul, konteks = item["title"], item["context"]
         img_main, img_cmt = item["img_main"], item["img_cmt"]
@@ -723,22 +723,22 @@ def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
 # 5. UI
 # ==========================================
 st.markdown('<div class="gns-eyebrow">Automation Tool</div>', unsafe_allow_html=True)
-st.title("GNS Censor to Endweek (Sekali Jalan)")
-st.caption("Upload → Sensor otomatis (review & approve) → Slide Midweek (gambar sensor) → Pilih Format → Slide Endweek jadi.")
+st.title("GNS Censor to Endweek (One-Shot)")
+st.caption("Upload → Automatic censor (review & approve) → Midweek Slide (censored images) → Choose Format → Endweek Slide done.")
 
 try:
     creds = get_creds()
 except Exception as e:
-    st.error(f"Gagal autentikasi ke Google: {e}")
+    st.error(f"Failed to authenticate with Google: {e}")
     st.stop()
 
 with st.sidebar:
-    st.header("Pengaturan Sensor")
-    offset_y = st.slider("Geser Vertikal (Y) px:", min_value=-20, max_value=20, value=-1, step=1)
-    pad_ukuran = st.slider("Lebar Ekstra (Padding px):", min_value=0, max_value=20, value=0, step=1)
+    st.header("Censor Settings")
+    offset_y = st.slider("Vertical Shift (Y) px:", min_value=-20, max_value=20, value=-1, step=1)
+    pad_ukuran = st.slider("Extra Width (Padding px):", min_value=0, max_value=20, value=0, step=1)
     match_threshold = st.slider(
-        "Ambang Kecocokan Nama (fuzzy match):", min_value=0.5, max_value=1.0, value=0.72, step=0.02,
-        help="Kalau ada nama yang gagal tersensor, coba turunkan nilai ini sedikit."
+        "Name Match Threshold (fuzzy match):", min_value=0.5, max_value=1.0, value=0.72, step=0.02,
+        help="If a name fails to get censored, try lowering this value a bit."
     )
 
 for key, default in [
@@ -751,20 +751,20 @@ for key, default in [
 
 st.divider()
 
-# ---------- TAHAP 1: UPLOAD ----------
-st.subheader("1. Upload Gambar")
-week_range_input = st.text_input("Masukkan Tanggal / Week Range (Bebas ketik):", value="")
-main_files = st.file_uploader("Upload gambar utama", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="main_uploader")
+# ---------- STAGE 1: UPLOAD ----------
+st.subheader("1. Upload Images")
+week_range_input = st.text_input("Enter Date / Week Range (free text):", value="")
+main_files = st.file_uploader("Upload main image", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="main_uploader")
 comment_files = st.file_uploader(
-    "Upload gambar komentar (opsional — nama file harus sama dengan gambar utama pasangannya)",
+    "Upload comment image (optional — filename must match its paired main image)",
     type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="comment_uploader"
 )
 promo_files = st.file_uploader(
-    "Upload gambar promo (opsional — TIDAK melalui sensor, langsung masuk Midweek apa adanya)",
+    "Upload promo image (optional — NOT censored, goes straight into Midweek as-is)",
     type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="promo_uploader"
 )
 if promo_files:
-    st.caption(f"{len(promo_files)} gambar promo siap (tidak disensor):")
+    st.caption(f"{len(promo_files)} promo image(s) ready (not censored):")
     cols = st.columns(min(len(promo_files), 6))
     for i, pf in enumerate(promo_files):
         cols[i % len(cols)].image(pf, caption=pf.name, use_container_width=True)
@@ -775,11 +775,11 @@ if main_files:
     for mf in main_files:
         news_items.append({"main": mf, "comment": comment_by_name.get(mf.name)})
 
-# ---------- TAHAP 2: SENSOR ----------
+# ---------- STAGE 2: CENSOR ----------
 if news_items:
     st.divider()
-    st.subheader("2. Sensor Otomatis")
-    mulai_sensor = st.button(f"Jalankan Sensor ({len(news_items)} pasang gambar)", type="primary", use_container_width=True)
+    st.subheader("2. Automatic Censor")
+    mulai_sensor = st.button(f"Run Censor ({len(news_items)} image pairs)", type="primary", use_container_width=True)
 
     if mulai_sensor:
         genai.configure(api_key=GEMINI_API_KEY)
@@ -813,55 +813,55 @@ if news_items:
                     "names_cmt": names_cmt, "unmatched_cmt": unmatched_cmt,
                 })
             except Exception as e:
-                st.error(f"Gagal memproses {main_file.name}: {e}")
+                st.error(f"Failed to process {main_file.name}: {e}")
             progress_bar.progress((idx + 1) / jumlah)
 
         st.session_state.censored_items = censored_items
         st.session_state.censor_done = True
-        st.session_state.approved = False  # reset approval kalau sensor dijalankan ulang
+        st.session_state.approved = False  # reset approval if censor is run again
         st.session_state.midweek_link = ""
         st.session_state.processed_data = []
-        st.success("Sensor selesai. Cek hasilnya di bawah sebelum lanjut ke Endweek.")
+        st.success("Censoring complete. Check the results below before continuing to Endweek.")
 
-# ---------- REVIEW HASIL SENSOR ----------
+# ---------- REVIEW CENSOR RESULTS ----------
 if st.session_state.censor_done and st.session_state.censored_items:
     st.divider()
-    st.subheader("Review Hasil Sensor")
+    st.subheader("Review Censor Results")
     for item in st.session_state.censored_items:
         with st.container(border=True):
             st.markdown(f"**{item['filename']}**")
             col1, col2 = st.columns(2)
-            col1.image(item["preview_main_asli"], caption="Utama - Asli", use_container_width=True)
-            col2.image(item["img_main_pil"], caption=f"Utama - Disensor ({len(item['names_main'])} nama)", use_container_width=True)
+            col1.image(item["preview_main_asli"], caption="Main - Original", use_container_width=True)
+            col2.image(item["img_main_pil"], caption=f"Main - Censored ({len(item['names_main'])} names)", use_container_width=True)
             if item["unmatched_main"]:
-                st.warning(f"Nama utama tidak tercocokkan: {item['unmatched_main']}")
+                st.warning(f"Main names not matched: {item['unmatched_main']}")
 
             if item["img_cmt_pil"] is not None:
                 col3, col4 = st.columns(2)
-                col3.image(item["preview_cmt_asli"], caption="Komentar - Asli", use_container_width=True)
-                col4.image(item["img_cmt_pil"], caption=f"Komentar - Disensor ({len(item['names_cmt'])} nama)", use_container_width=True)
+                col3.image(item["preview_cmt_asli"], caption="Comment - Original", use_container_width=True)
+                col4.image(item["img_cmt_pil"], caption=f"Comment - Censored ({len(item['names_cmt'])} names)", use_container_width=True)
                 if item["unmatched_cmt"]:
-                    st.warning(f"Nama komentar tidak tercocokkan: {item['unmatched_cmt']}")
+                    st.warning(f"Comment names not matched: {item['unmatched_cmt']}")
 
-    st.info("Kurang pas? Ubah slider di sidebar lalu klik **Jalankan Sensor** lagi di atas.")
+    st.info("Not quite right? Adjust the sliders in the sidebar then click **Run Censor** again above.")
 
-# ---------- LANJUT KE MIDWEEK ----------
+# ---------- CONTINUE TO MIDWEEK ----------
 butuh_sensor_dulu = bool(news_items) and not st.session_state.censor_done
 ada_yang_bisa_diproses = bool(st.session_state.censored_items) or bool(promo_files)
 
 if ada_yang_bisa_diproses and not butuh_sensor_dulu:
     st.divider()
     if not week_range_input.strip():
-        st.warning("Isi 'Tanggal / Week Range' di atas dulu sebelum lanjut ke Midweek.")
+        st.warning("Fill in 'Date / Week Range' above before continuing to Midweek.")
     else:
         jumlah_promo = len(promo_files or [])
         jumlah_sensor = len(st.session_state.censored_items)
-        label = f"Lanjut ke Midweek & Endweek ({jumlah_sensor} disensor + {jumlah_promo} promo)"
+        label = f"Continue to Midweek & Endweek ({jumlah_sensor} censored + {jumlah_promo} promo)"
         setuju = st.button(label, type="primary", use_container_width=True)
         if setuju:
             status_box2 = st.empty()
             progress_bar2 = st.progress(0)
-            with st.spinner("Membuat Slide Midweek & mengupload ke Drive..."):
+            with st.spinner("Creating Midweek Slide & uploading to Drive..."):
                 try:
                     promo_items = []
                     for pf in (promo_files or []):
@@ -876,23 +876,23 @@ if ada_yang_bisa_diproses and not butuh_sensor_dulu:
                     st.session_state.midweek_link = link_midweek
                     st.session_state.processed_data = processed_data
                     st.session_state.approved = True
-                    st.success("Slide Midweek selesai dibuat!")
+                    st.success("Midweek Slide created successfully!")
                 except Exception as e:
-                    st.error(f"Kesalahan saat membuat Midweek: {e}")
+                    st.error(f"Error while creating Midweek: {e}")
 
 if st.session_state.midweek_link:
-    st.markdown(f"**[Buka Presentasi Midweek]({st.session_state.midweek_link})**")
+    st.markdown(f"**[Open Midweek Presentation]({st.session_state.midweek_link})**")
 
-# ---------- TAHAP 3: PILIH FORMAT & GENERATE ENDWEEK ----------
+# ---------- STAGE 3: CHOOSE FORMAT & GENERATE ENDWEEK ----------
 if st.session_state.approved and st.session_state.processed_data:
     st.divider()
-    st.subheader("3. Kategori Slide untuk Endweek")
-    st.info("Pilih format presentasi untuk masing-masing gambar. Gambar yang dipakai di slide sudah versi tersensor.")
+    st.subheader("3. Slide Category for Endweek")
+    st.info("Choose the presentation format for each image. Images used in the slides are already the censored versions.")
 
     selections = {}
     for item in st.session_state.processed_data:
         selections[item["filename"]] = st.radio(
-            f"Format untuk gambar: **{item['filename']}**",
+            f"Format for image: **{item['filename']}**",
             options=["Format 1 (Facebook Group)", "Format 2 (Promotion)"],
             key=f"format_{item['filename']}",
             horizontal=True,
@@ -900,18 +900,18 @@ if st.session_state.approved and st.session_state.processed_data:
 
     if st.button("Buat Slide Endweek", type="secondary", use_container_width=True):
         status_box3 = st.empty()
-        with st.spinner("Menyusun Slide Endweek..."):
+        with st.spinner("Building Endweek Slide..."):
             try:
                 link_endweek = jalankan_otomatisasi_endweek(
                     creds, st.session_state.processed_data, selections, status_box3
                 )
                 st.session_state.endweek_link = link_endweek
-                st.success("Slide Endweek Selesai!")
+                st.success("Endweek Slide Complete!")
             except Exception as e:
-                st.error(f"Kesalahan saat menyusun Endweek: {e}")
+                st.error(f"Error while building Endweek: {e}")
 
 if st.session_state.endweek_link:
-    st.markdown(f"**[Buka Presentasi Endweek]({st.session_state.endweek_link})**")
+    st.markdown(f"**[Open Endweek Presentation]({st.session_state.endweek_link})**")
 
 if not news_items:
-    st.info("Upload gambar utama (dan komentar jika ada) untuk memulai.")
+    st.info("Upload the main image (and comment image, if any) to get started.")
