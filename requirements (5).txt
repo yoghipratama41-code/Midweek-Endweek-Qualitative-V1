@@ -1,0 +1,8 @@
+streamlit
+Pillow
+numpy
+easyocr
+google-generativeai
+google-api-python-client
+google-auth
+google-auth-oauthlib
