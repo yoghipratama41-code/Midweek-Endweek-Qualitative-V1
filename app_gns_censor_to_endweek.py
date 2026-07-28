@@ -19,7 +19,124 @@ from google.auth.transport.requests import Request as GoogleAuthRequest
 # ==========================================
 # 0. KONFIGURASI
 # ==========================================
-st.set_page_config(page_title="GNS Censor -> Endweek", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="GNS Censor -> Endweek", layout="wide")
+
+CUSTOM_CSS = """
+<style>
+:root {
+    --orange: #F5821F;
+    --orange-dark: #C9670F;
+    --orange-light: #FCEADB;
+    --white: #FFFFFF;
+    --off-white: #FAFAFA;
+    --text-dark: #1A1A1A;
+    --border-color: #E8D9C7;
+}
+
+html, body, [class*="css"] {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    color: var(--text-dark);
+}
+
+.stApp {
+    background-color: var(--white);
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: var(--off-white);
+    border-right: 1px solid var(--border-color);
+}
+section[data-testid="stSidebar"] * {
+    color: var(--text-dark);
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-dark) !important;
+    font-weight: 700 !important;
+}
+h1 {
+    border-bottom: 3px solid var(--orange);
+    padding-bottom: 10px;
+}
+
+/* Divider */
+hr {
+    border-top: 1px solid var(--border-color) !important;
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: var(--orange) !important;
+    color: var(--white) !important;
+    border: 1px solid var(--orange) !important;
+    border-radius: 6px !important;
+    font-weight: 600 !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.stButton > button:hover {
+    background-color: var(--orange-dark) !important;
+    border-color: var(--orange-dark) !important;
+    color: var(--white) !important;
+}
+.stButton > button[kind="secondary"] {
+    background-color: var(--white) !important;
+    color: var(--orange) !important;
+    border: 1px solid var(--orange) !important;
+}
+.stButton > button[kind="secondary"]:hover {
+    background-color: var(--orange-light) !important;
+    color: var(--orange-dark) !important;
+}
+
+/* Text inputs, sliders, file uploader */
+.stTextInput > div > div, .stFileUploader > div {
+    border-color: var(--border-color) !important;
+}
+.stSlider [data-baseweb="slider"] div[role="slider"] {
+    background-color: var(--orange) !important;
+    border-color: var(--orange) !important;
+}
+div[data-baseweb="slider"] > div > div:nth-child(2) {
+    background: var(--orange) !important;
+}
+
+/* Alerts: info / success / warning / error - flat orange, no gradients */
+div[data-testid="stAlert"] {
+    border-radius: 6px !important;
+    border: 1px solid var(--border-color) !important;
+    background-color: var(--orange-light) !important;
+}
+div[data-testid="stAlert"] p {
+    color: var(--text-dark) !important;
+}
+
+/* Progress bar */
+.stProgress > div > div > div > div {
+    background-color: var(--orange) !important;
+}
+
+/* Containers / cards */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    background-color: var(--off-white) !important;
+}
+
+/* Links */
+a {
+    color: var(--orange-dark) !important;
+    font-weight: 600;
+}
+
+/* Captions */
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: #6B6B6B !important;
+}
+</style>
+"""
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 GOOGLE_CLIENT_ID = st.secrets["GOOGLE_CLIENT_ID"]
@@ -106,15 +223,15 @@ def panggil_gemini_fallback(model_names, prompt, gambar_list, status_box, max_re
                 if "429" in err_msg or "503" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
                     wait_time = delay + random.uniform(0, 5)
                     status_box.warning(
-                        f"⚠️ Model **{nama_model_pendek}** kena limit/sibuk "
+                        f"Model **{nama_model_pendek}** kena limit/sibuk "
                         f"(percobaan {attempt + 1}/{max_retry_per_model}). Menunggu {wait_time:.1f}s..."
                     )
                     time.sleep(wait_time)
                     delay *= 2
                 else:
-                    status_box.warning(f"⚠️ Model **{nama_model_pendek}** error: {err_msg[:150]}")
+                    status_box.warning(f"Model **{nama_model_pendek}** error: {err_msg[:150]}")
                     break
-        status_box.info(f"➡️ Pindah dari model **{nama_model_pendek}** ke model berikutnya...")
+        status_box.info(f"Pindah dari model **{nama_model_pendek}** ke model berikutnya...")
     raise Exception(f"Semua model gagal dicoba. Error terakhir: {last_err}")
 
 
@@ -230,7 +347,7 @@ Strict Rules:
 5. The paragraph must consist of at least 3-4 sentences.
 
 Output Format:
-[TITLE] Write a long, specific, headline-style title, roughly 12-20 words, that reads like a mini research-slide headline capturing the core theme plus a specific supporting detail (not a short generic label). For reference, match this style and length:
+[TITLE] Write a long, specific, headline-style title, roughly 12-18 words, that reads like a mini research-slide headline capturing the core theme plus a specific supporting detail (not a short generic label). For reference, match this style and length:
 "Cross-Region Operational Challenges: Detailed Suggestion from Community Regarding Working on a Different Zone Registered"
 [CONTENT] Write the full paragraph here.
 """
@@ -401,7 +518,7 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
                 time.sleep(15)
 
         except Exception as e:
-            status_box.error(f"❌ {fname} dilewati: {e}")
+            status_box.error(f"{fname} dilewati: {e}")
         finally:
             progress_bar.progress((index + 1) / jumlah)
 
@@ -414,9 +531,9 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
                 valueInputOption="USER_ENTERED",
                 body={"values": sheets_append_data},
             ).execute()
-            status_box.success("✅ Data berhasil ditambahkan ke Spreadsheet!")
+            status_box.success("Data berhasil ditambahkan ke Spreadsheet!")
         except Exception as sheet_err:
-            status_box.error(f"⚠️ Slide Midweek sukses, namun gagal menambahkan ke Spreadsheet: {sheet_err}")
+            status_box.error(f"Slide Midweek sukses, namun gagal menambahkan ke Spreadsheet: {sheet_err}")
 
     return link_presentasi, processed_data
 
@@ -497,7 +614,7 @@ def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
 # ==========================================
 # 5. UI
 # ==========================================
-st.title("🛡️➡️📊 GNS Censor → Endweek (Sekali Jalan)")
+st.title("GNS Censor to Endweek (Sekali Jalan)")
 st.caption("Upload → Sensor otomatis (review & approve) → Slide Midweek (gambar sensor) → Pilih Format → Slide Endweek jadi.")
 
 try:
@@ -507,7 +624,7 @@ except Exception as e:
     st.stop()
 
 with st.sidebar:
-    st.header("🛠️ Pengaturan Sensor")
+    st.header("Pengaturan Sensor")
     offset_y = st.slider("Geser Vertikal (Y) px:", min_value=-20, max_value=20, value=-1, step=1)
     pad_ukuran = st.slider("Lebar Ekstra (Padding px):", min_value=0, max_value=20, value=0, step=1)
     match_threshold = st.slider(
@@ -526,7 +643,7 @@ for key, default in [
 st.divider()
 
 # ---------- TAHAP 1: UPLOAD ----------
-st.subheader("1️⃣ Upload Gambar")
+st.subheader("1. Upload Gambar")
 week_range_input = st.text_input("Masukkan Tanggal / Week Range (Bebas ketik):", value="")
 main_files = st.file_uploader("Upload gambar utama", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="main_uploader")
 comment_files = st.file_uploader(
@@ -538,7 +655,7 @@ promo_files = st.file_uploader(
     type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="promo_uploader"
 )
 if promo_files:
-    st.caption(f"🖼️ {len(promo_files)} gambar promo siap (tidak disensor):")
+    st.caption(f"{len(promo_files)} gambar promo siap (tidak disensor):")
     cols = st.columns(min(len(promo_files), 6))
     for i, pf in enumerate(promo_files):
         cols[i % len(cols)].image(pf, caption=pf.name, use_container_width=True)
@@ -552,8 +669,8 @@ if main_files:
 # ---------- TAHAP 2: SENSOR ----------
 if news_items:
     st.divider()
-    st.subheader("2️⃣ Sensor Otomatis")
-    mulai_sensor = st.button(f"🚀 Jalankan Sensor ({len(news_items)} pasang gambar)", type="primary", use_container_width=True)
+    st.subheader("2. Sensor Otomatis")
+    mulai_sensor = st.button(f"Jalankan Sensor ({len(news_items)} pasang gambar)", type="primary", use_container_width=True)
 
     if mulai_sensor:
         genai.configure(api_key=GEMINI_API_KEY)
@@ -587,7 +704,7 @@ if news_items:
                     "names_cmt": names_cmt, "unmatched_cmt": unmatched_cmt,
                 })
             except Exception as e:
-                st.error(f"❌ Gagal memproses {main_file.name}: {e}")
+                st.error(f"Gagal memproses {main_file.name}: {e}")
             progress_bar.progress((idx + 1) / jumlah)
 
         st.session_state.censored_items = censored_items
@@ -595,12 +712,12 @@ if news_items:
         st.session_state.approved = False  # reset approval kalau sensor dijalankan ulang
         st.session_state.midweek_link = ""
         st.session_state.processed_data = []
-        st.success("✅ Sensor selesai. Cek hasilnya di bawah sebelum lanjut ke Endweek.")
+        st.success("Sensor selesai. Cek hasilnya di bawah sebelum lanjut ke Endweek.")
 
 # ---------- REVIEW HASIL SENSOR (hanya relevan kalau ada gambar utama/komentar) ----------
 if st.session_state.censor_done and st.session_state.censored_items:
     st.divider()
-    st.subheader("👀 Review Hasil Sensor")
+    st.subheader("Review Hasil Sensor")
     for item in st.session_state.censored_items:
         with st.container(border=True):
             st.markdown(f"**{item['filename']}**")
@@ -608,16 +725,16 @@ if st.session_state.censor_done and st.session_state.censored_items:
             col1.image(item["preview_main_asli"], caption="Utama - Asli", use_container_width=True)
             col2.image(item["img_main_pil"], caption=f"Utama - Disensor ({len(item['names_main'])} nama)", use_container_width=True)
             if item["unmatched_main"]:
-                st.warning(f"⚠️ Nama utama tidak tercocokkan: {item['unmatched_main']}")
+                st.warning(f"Nama utama tidak tercocokkan: {item['unmatched_main']}")
 
             if item["img_cmt_pil"] is not None:
                 col3, col4 = st.columns(2)
                 col3.image(item["preview_cmt_asli"], caption="Komentar - Asli", use_container_width=True)
                 col4.image(item["img_cmt_pil"], caption=f"Komentar - Disensor ({len(item['names_cmt'])} nama)", use_container_width=True)
                 if item["unmatched_cmt"]:
-                    st.warning(f"⚠️ Nama komentar tidak tercocokkan: {item['unmatched_cmt']}")
+                    st.warning(f"Nama komentar tidak tercocokkan: {item['unmatched_cmt']}")
 
-    st.info("Kurang pas? Ubah slider di sidebar lalu klik **🚀 Jalankan Sensor** lagi di atas.")
+    st.info("Kurang pas? Ubah slider di sidebar lalu klik **Jalankan Sensor** lagi di atas.")
 
 # ---------- LANJUT KE MIDWEEK ----------
 # Bisa lanjut kalau: (tidak ada gambar utama sama sekali) ATAU (gambar utama sudah disensor & direview).
@@ -628,11 +745,11 @@ ada_yang_bisa_diproses = bool(st.session_state.censored_items) or bool(promo_fil
 if ada_yang_bisa_diproses and not butuh_sensor_dulu:
     st.divider()
     if not week_range_input.strip():
-        st.warning("⚠️ Isi 'Tanggal / Week Range' di atas dulu sebelum lanjut ke Midweek.")
+        st.warning("Isi 'Tanggal / Week Range' di atas dulu sebelum lanjut ke Midweek.")
     else:
         jumlah_promo = len(promo_files or [])
         jumlah_sensor = len(st.session_state.censored_items)
-        label = f"✅ Lanjut ke Midweek & Endweek ({jumlah_sensor} disensor + {jumlah_promo} promo)"
+        label = f"Lanjut ke Midweek & Endweek ({jumlah_sensor} disensor + {jumlah_promo} promo)"
         setuju = st.button(label, type="primary", use_container_width=True)
         if setuju:
             status_box2 = st.empty()
@@ -652,17 +769,17 @@ if ada_yang_bisa_diproses and not butuh_sensor_dulu:
                     st.session_state.midweek_link = link_midweek
                     st.session_state.processed_data = processed_data
                     st.session_state.approved = True
-                    st.success("🎉 Slide Midweek selesai dibuat!")
+                    st.success("Slide Midweek selesai dibuat!")
                 except Exception as e:
                     st.error(f"Kesalahan saat membuat Midweek: {e}")
 
 if st.session_state.midweek_link:
-    st.markdown(f"**[📂 Buka Presentasi Midweek]({st.session_state.midweek_link})**")
+    st.markdown(f"**[Buka Presentasi Midweek]({st.session_state.midweek_link})**")
 
 # ---------- TAHAP 3: PILIH FORMAT & GENERATE ENDWEEK ----------
 if st.session_state.approved and st.session_state.processed_data:
     st.divider()
-    st.subheader("3️⃣ Kategori Slide untuk Endweek")
+    st.subheader("3. Kategori Slide untuk Endweek")
     st.info("Pilih format presentasi untuk masing-masing gambar. Gambar yang dipakai di slide sudah versi tersensor.")
 
     selections = {}
@@ -674,7 +791,7 @@ if st.session_state.approved and st.session_state.processed_data:
             horizontal=True,
         )
 
-    if st.button("🚀 Buat Slide Endweek", type="secondary", use_container_width=True):
+    if st.button("Buat Slide Endweek", type="secondary", use_container_width=True):
         status_box3 = st.empty()
         with st.spinner("Menyusun Slide Endweek..."):
             try:
@@ -683,12 +800,12 @@ if st.session_state.approved and st.session_state.processed_data:
                 )
                 st.session_state.endweek_link = link_endweek
                 st.balloons()
-                st.success("🎉 Slide Endweek Selesai!")
+                st.success("Slide Endweek Selesai!")
             except Exception as e:
                 st.error(f"Kesalahan saat menyusun Endweek: {e}")
 
 if st.session_state.endweek_link:
-    st.markdown(f"**[📂 Buka Presentasi Endweek]({st.session_state.endweek_link})**")
+    st.markdown(f"**[Buka Presentasi Endweek]({st.session_state.endweek_link})**")
 
 if not news_items:
-    st.info("👆 Upload gambar utama (dan komentar jika ada) untuk memulai.")
+    st.info("Upload gambar utama (dan komentar jika ada) untuk memulai.")
