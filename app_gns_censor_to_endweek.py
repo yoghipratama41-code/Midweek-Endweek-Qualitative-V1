@@ -26,11 +26,13 @@ CUSTOM_CSS = """
 :root {
     --orange: #F5821F;
     --orange-dark: #C9670F;
-    --orange-light: #FCEADB;
+    --orange-soft: #FDF1E4;
+    --orange-border: #F0C89B;
     --white: #FFFFFF;
     --off-white: #FAFAFA;
-    --text-dark: #1A1A1A;
-    --border-color: #E8D9C7;
+    --text-dark: #1F1F1F;
+    --text-muted: #6B6B6B;
+    --border-color: #EAEAEA;
 }
 
 html, body, [class*="css"] {
@@ -42,97 +44,177 @@ html, body, [class*="css"] {
     background-color: var(--white);
 }
 
-/* Sidebar */
+.block-container {
+    padding-top: 2rem;
+}
+
+/* ---------- Hero / title area ---------- */
+.gns-eyebrow {
+    display: inline-block;
+    color: var(--orange);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+}
+h1 {
+    color: var(--text-dark) !important;
+    font-weight: 800 !important;
+    padding-bottom: 0 !important;
+    border-bottom: none !important;
+}
+h1::after {
+    content: "";
+    display: block;
+    width: 64px;
+    height: 4px;
+    background-color: var(--orange);
+    border-radius: 2px;
+    margin-top: 10px;
+}
+h2, h3, h4, h5, h6 {
+    color: var(--text-dark) !important;
+    font-weight: 700 !important;
+}
+
+/* Section subheaders get a small orange marker, like a card icon accent */
+h3::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--orange);
+    border-radius: 2px;
+    margin-right: 8px;
+}
+
+/* ---------- Sidebar ---------- */
 section[data-testid="stSidebar"] {
     background-color: var(--off-white);
     border-right: 1px solid var(--border-color);
 }
-section[data-testid="stSidebar"] * {
-    color: var(--text-dark);
-}
-
-/* Headings */
-h1, h2, h3, h4, h5, h6 {
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3 {
     color: var(--text-dark) !important;
-    font-weight: 700 !important;
 }
-h1 {
-    border-bottom: 3px solid var(--orange);
-    padding-bottom: 10px;
+section[data-testid="stSidebar"] h2::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: var(--orange);
+    border-radius: 2px;
+    margin-right: 8px;
 }
 
-/* Divider */
+/* ---------- Divider ---------- */
 hr {
     border-top: 1px solid var(--border-color) !important;
 }
 
-/* Buttons */
-.stButton > button {
+/* ---------- Buttons (primary + secondary) ---------- */
+.stButton > button, .stDownloadButton > button {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.stButton > button[kind="primary"] {
     background-color: var(--orange) !important;
     color: var(--white) !important;
     border: 1px solid var(--orange) !important;
-    border-radius: 6px !important;
-    font-weight: 600 !important;
-    transition: background-color 0.15s ease, color 0.15s ease;
 }
-.stButton > button:hover {
+.stButton > button[kind="primary"]:hover {
     background-color: var(--orange-dark) !important;
     border-color: var(--orange-dark) !important;
     color: var(--white) !important;
 }
 .stButton > button[kind="secondary"] {
     background-color: var(--white) !important;
-    color: var(--orange) !important;
-    border: 1px solid var(--orange) !important;
+    color: var(--text-dark) !important;
+    border: 1px solid var(--border-color) !important;
 }
 .stButton > button[kind="secondary"]:hover {
-    background-color: var(--orange-light) !important;
+    border-color: var(--orange) !important;
     color: var(--orange-dark) !important;
 }
 
-/* Text inputs, sliders, file uploader */
-.stTextInput > div > div, .stFileUploader > div {
-    border-color: var(--border-color) !important;
+/* File uploader "Browse files" button + dropzone */
+[data-testid="stFileUploaderDropzone"] {
+    background-color: var(--off-white) !important;
+    border: 1px dashed var(--orange-border) !important;
+    border-radius: 10px !important;
 }
-.stSlider [data-baseweb="slider"] div[role="slider"] {
-    background-color: var(--orange) !important;
-    border-color: var(--orange) !important;
+[data-testid="stFileUploaderDropzone"] button {
+    background-color: var(--white) !important;
+    color: var(--orange-dark) !important;
+    border: 1px solid var(--orange) !important;
+    border-radius: 6px !important;
 }
-div[data-baseweb="slider"] > div > div:nth-child(2) {
-    background: var(--orange) !important;
+[data-testid="stFileUploaderDropzone"] button:hover {
+    background-color: var(--orange-soft) !important;
 }
 
-/* Alerts: info / success / warning / error - flat orange, no gradients */
+/* ---------- Sliders (handle + filled track) ---------- */
+div[data-baseweb="slider"] div[role="slider"] {
+    background-color: var(--orange) !important;
+    border-color: var(--orange) !important;
+    box-shadow: none !important;
+}
+div[data-baseweb="slider"] > div > div {
+    background-color: var(--orange) !important;
+}
+div[data-baseweb="slider"] > div:first-child {
+    background-color: var(--border-color) !important;
+}
+
+/* ---------- Radio / checkbox accent ---------- */
+label[data-baseweb="radio"] div:first-child,
+label[data-baseweb="checkbox"] div:first-child {
+    border-color: var(--orange-border) !important;
+}
+
+/* ---------- Alerts: info / success / warning / error ---------- */
+/* Kept subtle -- thin orange left accent instead of full orange fill, so it never overwhelms */
 div[data-testid="stAlert"] {
     border-radius: 6px !important;
     border: 1px solid var(--border-color) !important;
-    background-color: var(--orange-light) !important;
+    border-left: 4px solid var(--orange) !important;
+    background-color: var(--off-white) !important;
 }
 div[data-testid="stAlert"] p {
     color: var(--text-dark) !important;
 }
 
-/* Progress bar */
+/* ---------- Progress bar ---------- */
 .stProgress > div > div > div > div {
     background-color: var(--orange) !important;
 }
 
-/* Containers / cards */
+/* ---------- Containers / cards ---------- */
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border: 1px solid var(--border-color) !important;
-    border-radius: 8px !important;
-    background-color: var(--off-white) !important;
+    border-radius: 10px !important;
+    background-color: var(--white) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-/* Links */
+/* ---------- Text input focus ---------- */
+.stTextInput > div > div:focus-within {
+    border-color: var(--orange) !important;
+    box-shadow: 0 0 0 1px var(--orange) !important;
+}
+
+/* ---------- Links ---------- */
 a {
     color: var(--orange-dark) !important;
     font-weight: 600;
 }
 
-/* Captions */
+/* ---------- Captions ---------- */
 .stCaption, [data-testid="stCaptionContainer"] {
-    color: #6B6B6B !important;
+    color: var(--text-muted) !important;
 }
 </style>
 """
@@ -614,6 +696,7 @@ def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
 # ==========================================
 # 5. UI
 # ==========================================
+st.markdown('<div class="gns-eyebrow">Automation Tool</div>', unsafe_allow_html=True)
 st.title("GNS Censor to Endweek (Sekali Jalan)")
 st.caption("Upload → Sensor otomatis (review & approve) → Slide Midweek (gambar sensor) → Pilih Format → Slide Endweek jadi.")
 
