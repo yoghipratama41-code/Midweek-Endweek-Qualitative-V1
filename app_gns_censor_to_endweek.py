@@ -23,32 +23,30 @@ st.set_page_config(page_title="GNS Censor -> Endweek", layout="wide")
 
 CUSTOM_CSS = """
 <style>
+/* ORANGE & WHITE STRICT DARK THEME */
 :root {
     --orange: #F5821F;
-    --orange-dark: #C9670F;
-    --orange-soft: #FDF1E4;
-    --orange-border: #F0C89B;
+    --bg-dark: #121212;
+    --bg-card: #1E1E1E;
     --white: #FFFFFF;
-    --off-white: #FAFAFA;
-    --text-dark: #1F1F1F;
-    --text-muted: #6B6B6B;
-    --border-color: #EAEAEA;
+    --text-muted: #A0A0A0;
 }
 
 html, body, [class*="css"] {
     font-family: "Helvetica Neue", Arial, sans-serif;
-    color: var(--text-dark);
+    color: var(--white);
 }
 
 .stApp {
-    background-color: var(--white);
+    background-color: var(--bg-dark);
 }
 
+/* Remove default Streamlit top padding */
 .block-container {
     padding-top: 2rem;
 }
 
-/* ---------- Hero / title area ---------- */
+/* ---------- Typography & Headers ---------- */
 .gns-eyebrow {
     display: inline-block;
     color: var(--orange);
@@ -59,7 +57,7 @@ html, body, [class*="css"] {
     margin-bottom: 0.4rem;
 }
 h1 {
-    color: var(--text-dark) !important;
+    color: var(--white) !important;
     font-weight: 800 !important;
     padding-bottom: 0 !important;
     border-bottom: none !important;
@@ -70,34 +68,32 @@ h1::after {
     width: 64px;
     height: 4px;
     background-color: var(--orange);
-    border-radius: 2px;
     margin-top: 10px;
 }
 h2, h3, h4, h5, h6 {
-    color: var(--text-dark) !important;
+    color: var(--white) !important;
     font-weight: 700 !important;
 }
 
-/* Section subheaders get a small orange marker, like a card icon accent */
+/* Solid square accents for subheaders instead of emojis */
 h3::before {
     content: "";
     display: inline-block;
     width: 8px;
     height: 8px;
     background-color: var(--orange);
-    border-radius: 2px;
     margin-right: 8px;
 }
 
 /* ---------- Sidebar ---------- */
 section[data-testid="stSidebar"] {
-    background-color: var(--off-white);
-    border-right: 1px solid var(--border-color);
+    background-color: var(--bg-card) !important;
+    border-right: 1px solid var(--orange) !important;
 }
 section[data-testid="stSidebar"] h1,
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3 {
-    color: var(--text-dark) !important;
+    color: var(--white) !important;
 }
 section[data-testid="stSidebar"] h2::before {
     content: "";
@@ -105,55 +101,66 @@ section[data-testid="stSidebar"] h2::before {
     width: 8px;
     height: 8px;
     background-color: var(--orange);
-    border-radius: 2px;
     margin-right: 8px;
 }
 
 /* ---------- Divider ---------- */
 hr {
-    border-top: 1px solid var(--border-color) !important;
+    border-top: 1px solid var(--orange) !important;
+    opacity: 0.3;
 }
 
-/* ---------- Buttons (primary + secondary) ---------- */
+/* ---------- Buttons ---------- */
 .stButton > button, .stDownloadButton > button {
-    border-radius: 8px !important;
+    border-radius: 2px !important; /* Sharp corners, no gradients */
     font-weight: 600 !important;
-    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.stButton > button[kind="primary"] {
+    transition: all 0.2s ease;
     background-color: var(--orange) !important;
-    color: var(--white) !important;
+    color: var(--bg-dark) !important; 
     border: 1px solid var(--orange) !important;
 }
-.stButton > button[kind="primary"]:hover {
-    background-color: var(--orange-dark) !important;
-    border-color: var(--orange-dark) !important;
-    color: var(--white) !important;
+.stButton > button p {
+    color: var(--bg-dark) !important;
 }
+.stButton > button:hover {
+    background-color: var(--bg-dark) !important;
+    color: var(--orange) !important;
+}
+.stButton > button:hover p {
+    color: var(--orange) !important;
+}
+
+/* Secondary Button override */
 .stButton > button[kind="secondary"] {
-    background-color: var(--white) !important;
-    color: var(--text-dark) !important;
-    border: 1px solid var(--border-color) !important;
+    background-color: var(--bg-card) !important;
+    color: var(--orange) !important;
+    border: 1px solid var(--orange) !important;
+}
+.stButton > button[kind="secondary"] p {
+    color: var(--orange) !important;
 }
 .stButton > button[kind="secondary"]:hover {
-    border-color: var(--orange) !important;
-    color: var(--orange-dark) !important;
+    background-color: var(--orange) !important;
+    color: var(--bg-dark) !important;
+}
+.stButton > button[kind="secondary"]:hover p {
+    color: var(--bg-dark) !important;
 }
 
-/* File uploader "Browse files" button + dropzone */
+/* ---------- File Uploader ---------- */
 [data-testid="stFileUploaderDropzone"] {
-    background-color: var(--off-white) !important;
-    border: 1px dashed var(--orange-border) !important;
-    border-radius: 10px !important;
+    background-color: var(--bg-card) !important;
+    border: 1px dashed var(--orange) !important;
+    border-radius: 2px !important;
 }
 [data-testid="stFileUploaderDropzone"] button {
-    background-color: var(--white) !important;
-    color: var(--orange-dark) !important;
+    background-color: var(--bg-dark) !important;
+    color: var(--white) !important;
     border: 1px solid var(--orange) !important;
-    border-radius: 6px !important;
 }
 [data-testid="stFileUploaderDropzone"] button:hover {
-    background-color: var(--orange-soft) !important;
+    background-color: var(--orange) !important;
+    color: var(--bg-dark) !important;
 }
 
 /* ---------- Sliders (handle + filled track) ---------- */
@@ -166,25 +173,27 @@ div[data-baseweb="slider"] > div > div {
     background-color: var(--orange) !important;
 }
 div[data-baseweb="slider"] > div:first-child {
-    background-color: var(--border-color) !important;
+    background-color: #333333 !important;
 }
 
-/* ---------- Radio / checkbox accent ---------- */
+/* ---------- Radio / Checkbox ---------- */
 label[data-baseweb="radio"] div:first-child,
 label[data-baseweb="checkbox"] div:first-child {
-    border-color: var(--orange-border) !important;
+    border-color: var(--orange) !important;
 }
 
-/* ---------- Alerts: info / success / warning / error ---------- */
-/* Kept subtle -- thin orange left accent instead of full orange fill, so it never overwhelms */
+/* ---------- Alerts (Info/Success/Error/Warning) ---------- */
 div[data-testid="stAlert"] {
-    border-radius: 6px !important;
-    border: 1px solid var(--border-color) !important;
-    border-left: 4px solid var(--orange) !important;
-    background-color: var(--off-white) !important;
+    border-radius: 2px !important;
+    border: 1px solid var(--orange) !important;
+    background-color: var(--bg-card) !important;
 }
 div[data-testid="stAlert"] p {
-    color: var(--text-dark) !important;
+    color: var(--white) !important;
+}
+/* Force hide alert icons (emotes) generated natively by Streamlit */
+div[data-testid="stAlert"] span[role="img"] {
+    display: none !important;
 }
 
 /* ---------- Progress bar ---------- */
@@ -192,23 +201,28 @@ div[data-testid="stAlert"] p {
     background-color: var(--orange) !important;
 }
 
-/* ---------- Containers / cards ---------- */
+/* ---------- Containers / Cards ---------- */
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    border: 1px solid var(--border-color) !important;
-    border-radius: 10px !important;
-    background-color: var(--white) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--orange) !important;
+    border-radius: 2px !important;
+    background-color: var(--bg-card) !important;
+    box-shadow: none !important;
 }
 
 /* ---------- Text input focus ---------- */
+.stTextInput > div > div {
+    background-color: var(--bg-dark) !important;
+    border: 1px solid #333333 !important;
+    color: var(--white) !important;
+}
 .stTextInput > div > div:focus-within {
     border-color: var(--orange) !important;
-    box-shadow: 0 0 0 1px var(--orange) !important;
+    box-shadow: none !important;
 }
 
 /* ---------- Links ---------- */
 a {
-    color: var(--orange-dark) !important;
+    color: var(--orange) !important;
     font-weight: 600;
 }
 
@@ -488,15 +502,6 @@ def cari_template_slide_endweek(presentation):
 
 
 def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, progress_bar, status_box):
-    """
-    Sama seperti jalankan_otomatisasi_midweek versi asli, tapi:
-    - gambar yang dipakai adalah gambar yang SUDAH DISENSOR (bukan file upload asli)
-    - setiap slide baru dibuat dengan duplicateObject() dari slide template,
-      lalu placeholder-nya diisi di slide HASIL DUPLIKAT — template referensi sendiri
-      tidak pernah disentuh/diedit langsung.
-    Return: (link_presentasi_midweek, processed_data) — processed_data lalu dipakai
-    untuk generate Endweek di tahap berikutnya.
-    """
     drive_service = build("drive", "v3", credentials=creds)
     slides_service = build("slides", "v1", credentials=creds)
     sheets_service = build("sheets", "v4", credentials=creds)
@@ -563,7 +568,6 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
                 "img_cmt": link_gambar_comment,
             })
 
-            # ---- Slide gambar utama: duplicate dari template, edit di hasil duplikat ----
             res_dup = slides_service.presentations().batchUpdate(
                 presentationId=id_slide_baru,
                 body={"requests": [{"duplicateObject": {"objectId": id_templat_main}}]},
@@ -580,7 +584,6 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
             slides_service.presentations().batchUpdate(presentationId=id_slide_baru, body={"requests": req_main}).execute()
             slide_count += 1
 
-            # ---- Slide gambar komentar (kalau ada): duplicate juga dari template ----
             if item.get("img_cmt_pil") is not None and id_templat_comment:
                 res_dup_c = slides_service.presentations().batchUpdate(
                     presentationId=id_slide_baru,
@@ -797,7 +800,7 @@ if news_items:
         st.session_state.processed_data = []
         st.success("Sensor selesai. Cek hasilnya di bawah sebelum lanjut ke Endweek.")
 
-# ---------- REVIEW HASIL SENSOR (hanya relevan kalau ada gambar utama/komentar) ----------
+# ---------- REVIEW HASIL SENSOR ----------
 if st.session_state.censor_done and st.session_state.censored_items:
     st.divider()
     st.subheader("Review Hasil Sensor")
@@ -820,8 +823,6 @@ if st.session_state.censor_done and st.session_state.censored_items:
     st.info("Kurang pas? Ubah slider di sidebar lalu klik **Jalankan Sensor** lagi di atas.")
 
 # ---------- LANJUT KE MIDWEEK ----------
-# Bisa lanjut kalau: (tidak ada gambar utama sama sekali) ATAU (gambar utama sudah disensor & direview).
-# Gambar promo tidak perlu menunggu apa pun — langsung ikut ke Midweek apa adanya.
 butuh_sensor_dulu = bool(news_items) and not st.session_state.censor_done
 ada_yang_bisa_diproses = bool(st.session_state.censored_items) or bool(promo_files)
 
@@ -882,7 +883,6 @@ if st.session_state.approved and st.session_state.processed_data:
                     creds, st.session_state.processed_data, selections, status_box3
                 )
                 st.session_state.endweek_link = link_endweek
-                st.balloons()
                 st.success("Slide Endweek Selesai!")
             except Exception as e:
                 st.error(f"Kesalahan saat menyusun Endweek: {e}")
