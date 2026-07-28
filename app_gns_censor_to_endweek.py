@@ -25,6 +25,7 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 GOOGLE_CLIENT_ID = st.secrets["GOOGLE_CLIENT_ID"]
 GOOGLE_CLIENT_SECRET = st.secrets["GOOGLE_CLIENT_SECRET"]
 GOOGLE_REFRESH_TOKEN = st.secrets["GOOGLE_REFRESH_TOKEN"]
+TEMPLATE_PRESENTATION_ID = st.secrets["TEMPLATE_PRESENTATION_ID"]
 
 ENDWEEK_TEMPLATE_ID = "1PvaGfcS1dBMcW-48HQWLEXT3irKPFi9Ptm5eqloX9QA"
 TARGET_SPREADSHEET_ID = "1D0CnYZwZtx75OXJGvHeJCiMe6t-pt0UhTOm7vYhbGLQ"
@@ -262,6 +263,18 @@ def _get_slide_text(slide):
     return "".join(texts)
 
 
+def cari_template_slide(presentation):
+    id_main = None
+    id_comment = None
+    for slide in presentation.get("slides", []):
+        txt = _get_slide_text(slide)
+        if "{{IMG}}" in txt and id_main is None:
+            id_main = slide["objectId"]
+        if "{{CMT}}" in txt and id_comment is None:
+            id_comment = slide["objectId"]
+    return id_main, id_comment
+
+
 def cari_template_slide_endweek(presentation):
     id_fb_main, id_fb_comment, id_promo_main = None, None, None
     for slide in presentation.get("slides", []):
@@ -275,32 +288,52 @@ def cari_template_slide_endweek(presentation):
     return id_fb_main, id_fb_comment, id_promo_main
 
 
-def analisis_dan_upload_untuk_endweek(creds, censored_items, week_range, progress_bar, status_box):
+def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, progress_bar, status_box):
     """
-    Untuk tiap item yang SUDAH disensor: minta Gemini analisis title/context/insight,
-    upload gambar (yang sudah disensor) ke Drive, dan kumpulkan datanya utk Endweek.
-    TIDAK membuat slide Midweek — hanya menyiapkan processed_data utk Endweek.
+    Sama seperti jalankan_otomatisasi_midweek versi asli, tapi:
+    - gambar yang dipakai adalah gambar yang SUDAH DISENSOR (bukan file upload asli)
+    - setiap slide baru dibuat dengan duplicateObject() dari slide template,
+      lalu placeholder-nya diisi di slide HASIL DUPLIKAT — template referensi sendiri
+      tidak pernah disentuh/diedit langsung.
+    Return: (link_presentasi_midweek, processed_data) — processed_data lalu dipakai
+    untuk generate Endweek di tahap berikutnya.
     """
     drive_service = build("drive", "v3", credentials=creds)
+    slides_service = build("slides", "v1", credentials=creds)
     sheets_service = build("sheets", "v4", credentials=creds)
     genai.configure(api_key=GEMINI_API_KEY)
     model_fallback_list = get_model_fallback_list()
 
+    nama_slide_baru = f"Final Midweek - {time.strftime('%Y-%m-%d %H:%M:%S')}"
+    copy = drive_service.files().copy(
+        fileId=TEMPLATE_PRESENTATION_ID, body={"name": nama_slide_baru}
+    ).execute()
+    id_slide_baru = copy.get("id")
+    link_presentasi = f"https://docs.google.com/presentation/d/{id_slide_baru}/edit"
+
+    presentation = slides_service.presentations().get(presentationId=id_slide_baru).execute()
+    id_templat_main, id_templat_comment = cari_template_slide(presentation)
+    if not id_templat_main:
+        raise Exception("Template Midweek tidak ditemukan! Pastikan ada slide berisi placeholder '{{IMG}}'.")
+
+    slide_count = len(presentation.get("slides", []))
+    jumlah = len(censored_items)
+
     processed_data = []
     sheets_append_data = []
-    jumlah = len(censored_items)
 
     for index, item in enumerate(censored_items):
         fname = item["filename"]
         try:
-            status_box.info(f"[{index+1}/{jumlah}] Menganalisis & Upload: {fname}...")
+            status_box.info(f"[{index+1}/{jumlah}] Memproses Midweek: {fname}...")
 
             gambar_list = [item["img_main_pil"]]
             if item.get("img_cmt_pil") is not None:
                 gambar_list.append(item["img_cmt_pil"])
 
+            prompt_ai = PROMPT_ANALISIS
             teks_raw, model_dipakai = panggil_gemini_fallback(
-                model_fallback_list, PROMPT_ANALISIS, gambar_list, status_box
+                model_fallback_list, prompt_ai, gambar_list, status_box
             )
             judul = teks_raw.split("[TITLE]")[1].split("[CONTENT]")[0].strip()
             full_para = teks_raw.split("[CONTENT]")[1].strip()
@@ -309,9 +342,11 @@ def analisis_dan_upload_untuk_endweek(creds, censored_items, week_range, progres
             if len(sentences) > 1:
                 konteks = sentences[0]
                 insight_list = [s for s in sentences[1:] if s.strip()]
+                insight_midweek = "\n".join(insight_list)
             else:
                 konteks = full_para
                 insight_list = []
+                insight_midweek = "-"
 
             sheets_append_data.append([week_range, judul, konteks])
 
@@ -328,6 +363,39 @@ def analisis_dan_upload_untuk_endweek(creds, censored_items, week_range, progres
                 "img_main": link_gambar_main,
                 "img_cmt": link_gambar_comment,
             })
+
+            # ---- Slide gambar utama: duplicate dari template, edit di hasil duplikat ----
+            res_dup = slides_service.presentations().batchUpdate(
+                presentationId=id_slide_baru,
+                body={"requests": [{"duplicateObject": {"objectId": id_templat_main}}]},
+            ).execute()
+            id_baru_main = res_dup["replies"][0]["duplicateObject"]["objectId"]
+
+            req_main = [
+                {"updateSlidesPosition": {"slideObjectIds": [id_baru_main], "insertionIndex": slide_count}},
+                {"replaceAllText": {"containsText": {"text": "{{TITLE}}"}, "replaceText": judul, "pageObjectIds": [id_baru_main]}},
+                {"replaceAllText": {"containsText": {"text": "{{CONTEXT}}"}, "replaceText": konteks, "pageObjectIds": [id_baru_main]}},
+                {"replaceAllText": {"containsText": {"text": "{{INSIGHT}}"}, "replaceText": insight_midweek, "pageObjectIds": [id_baru_main]}},
+                {"replaceAllShapesWithImage": {"imageUrl": link_gambar_main, "replaceMethod": "CENTER_INSIDE", "containsText": {"text": "{{IMG}}", "matchCase": True}, "pageObjectIds": [id_baru_main]}},
+            ]
+            slides_service.presentations().batchUpdate(presentationId=id_slide_baru, body={"requests": req_main}).execute()
+            slide_count += 1
+
+            # ---- Slide gambar komentar (kalau ada): duplicate juga dari template ----
+            if item.get("img_cmt_pil") is not None and id_templat_comment:
+                res_dup_c = slides_service.presentations().batchUpdate(
+                    presentationId=id_slide_baru,
+                    body={"requests": [{"duplicateObject": {"objectId": id_templat_comment}}]},
+                ).execute()
+                id_baru_comment = res_dup_c["replies"][0]["duplicateObject"]["objectId"]
+
+                req_cmt = [
+                    {"updateSlidesPosition": {"slideObjectIds": [id_baru_comment], "insertionIndex": slide_count}},
+                    {"replaceAllText": {"containsText": {"text": "{{TITLE}}"}, "replaceText": judul, "pageObjectIds": [id_baru_comment]}},
+                    {"replaceAllShapesWithImage": {"imageUrl": link_gambar_comment, "replaceMethod": "CENTER_INSIDE", "containsText": {"text": "{{CMT}}", "matchCase": True}, "pageObjectIds": [id_baru_comment]}},
+                ]
+                slides_service.presentations().batchUpdate(presentationId=id_slide_baru, body={"requests": req_cmt}).execute()
+                slide_count += 1
 
             if index < jumlah - 1:
                 time.sleep(15)
@@ -348,9 +416,9 @@ def analisis_dan_upload_untuk_endweek(creds, censored_items, week_range, progres
             ).execute()
             status_box.success("✅ Data berhasil ditambahkan ke Spreadsheet!")
         except Exception as sheet_err:
-            status_box.error(f"⚠️ Analisis sukses, namun gagal menambahkan ke Spreadsheet: {sheet_err}")
+            status_box.error(f"⚠️ Slide Midweek sukses, namun gagal menambahkan ke Spreadsheet: {sheet_err}")
 
-    return processed_data
+    return link_presentasi, processed_data
 
 
 def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
@@ -430,7 +498,7 @@ def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
 # 5. UI
 # ==========================================
 st.title("🛡️➡️📊 GNS Censor → Endweek (Sekali Jalan)")
-st.caption("Upload → Sensor otomatis (review & approve) → AI Analysis → Pilih Format → Slide Endweek jadi.")
+st.caption("Upload → Sensor otomatis (review & approve) → Slide Midweek (gambar sensor) → Pilih Format → Slide Endweek jadi.")
 
 try:
     creds = get_creds()
@@ -450,7 +518,7 @@ with st.sidebar:
 for key, default in [
     ("censor_done", False), ("censored_items", []),
     ("approved", False), ("processed_data", []),
-    ("endweek_link", ""),
+    ("midweek_link", ""), ("endweek_link", ""),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -465,6 +533,15 @@ comment_files = st.file_uploader(
     "Upload gambar komentar (opsional — nama file harus sama dengan gambar utama pasangannya)",
     type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="comment_uploader"
 )
+promo_files = st.file_uploader(
+    "Upload gambar promo (opsional — TIDAK melalui sensor, langsung masuk Midweek apa adanya)",
+    type=["jpg", "jpeg", "png"], accept_multiple_files=True, key="promo_uploader"
+)
+if promo_files:
+    st.caption(f"🖼️ {len(promo_files)} gambar promo siap (tidak disensor):")
+    cols = st.columns(min(len(promo_files), 6))
+    for i, pf in enumerate(promo_files):
+        cols[i % len(cols)].image(pf, caption=pf.name, use_container_width=True)
 
 news_items = []
 if main_files:
@@ -516,9 +593,11 @@ if news_items:
         st.session_state.censored_items = censored_items
         st.session_state.censor_done = True
         st.session_state.approved = False  # reset approval kalau sensor dijalankan ulang
+        st.session_state.midweek_link = ""
+        st.session_state.processed_data = []
         st.success("✅ Sensor selesai. Cek hasilnya di bawah sebelum lanjut ke Endweek.")
 
-# ---------- REVIEW HASIL SENSOR ----------
+# ---------- REVIEW HASIL SENSOR (hanya relevan kalau ada gambar utama/komentar) ----------
 if st.session_state.censor_done and st.session_state.censored_items:
     st.divider()
     st.subheader("👀 Review Hasil Sensor")
@@ -540,23 +619,45 @@ if st.session_state.censor_done and st.session_state.censored_items:
 
     st.info("Kurang pas? Ubah slider di sidebar lalu klik **🚀 Jalankan Sensor** lagi di atas.")
 
+# ---------- LANJUT KE MIDWEEK ----------
+# Bisa lanjut kalau: (tidak ada gambar utama sama sekali) ATAU (gambar utama sudah disensor & direview).
+# Gambar promo tidak perlu menunggu apa pun — langsung ikut ke Midweek apa adanya.
+butuh_sensor_dulu = bool(news_items) and not st.session_state.censor_done
+ada_yang_bisa_diproses = bool(st.session_state.censored_items) or bool(promo_files)
+
+if ada_yang_bisa_diproses and not butuh_sensor_dulu:
+    st.divider()
     if not week_range_input.strip():
-        st.warning("⚠️ Isi 'Tanggal / Week Range' di atas dulu sebelum lanjut ke Endweek.")
+        st.warning("⚠️ Isi 'Tanggal / Week Range' di atas dulu sebelum lanjut ke Midweek.")
     else:
-        setuju = st.button("✅ Saya OK dengan Hasil Sensor Ini — Lanjut ke Endweek (AI Analysis & Upload)", type="primary", use_container_width=True)
+        jumlah_promo = len(promo_files or [])
+        jumlah_sensor = len(st.session_state.censored_items)
+        label = f"✅ Lanjut ke Midweek & Endweek ({jumlah_sensor} disensor + {jumlah_promo} promo)"
+        setuju = st.button(label, type="primary", use_container_width=True)
         if setuju:
             status_box2 = st.empty()
             progress_bar2 = st.progress(0)
-            with st.spinner("Menganalisis gambar (yang sudah disensor) & mengupload ke Drive..."):
+            with st.spinner("Membuat Slide Midweek & mengupload ke Drive..."):
                 try:
-                    processed_data = analisis_dan_upload_untuk_endweek(
-                        creds, st.session_state.censored_items, week_range_input, progress_bar2, status_box2
+                    promo_items = []
+                    for pf in (promo_files or []):
+                        img_promo = PIL.Image.open(pf).convert("RGB")
+                        promo_items.append({"filename": pf.name, "img_main_pil": img_promo, "img_cmt_pil": None})
+
+                    semua_items = st.session_state.censored_items + promo_items
+
+                    link_midweek, processed_data = jalankan_otomatisasi_midweek_dari_sensor(
+                        creds, semua_items, week_range_input, progress_bar2, status_box2
                     )
+                    st.session_state.midweek_link = link_midweek
                     st.session_state.processed_data = processed_data
                     st.session_state.approved = True
-                    st.success("🎉 Analisis & upload gambar (sudah disensor) selesai!")
+                    st.success("🎉 Slide Midweek selesai dibuat!")
                 except Exception as e:
-                    st.error(f"Kesalahan saat analisis/upload: {e}")
+                    st.error(f"Kesalahan saat membuat Midweek: {e}")
+
+if st.session_state.midweek_link:
+    st.markdown(f"**[📂 Buka Presentasi Midweek]({st.session_state.midweek_link})**")
 
 # ---------- TAHAP 3: PILIH FORMAT & GENERATE ENDWEEK ----------
 if st.session_state.approved and st.session_state.processed_data:
