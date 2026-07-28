@@ -479,13 +479,16 @@ def _get_slide_text(slide):
 def cari_template_slide(presentation):
     id_main = None
     id_comment = None
+    id_summary = None
     for slide in presentation.get("slides", []):
         txt = _get_slide_text(slide)
         if "{{IMG}}" in txt and id_main is None:
             id_main = slide["objectId"]
         if "{{CMT}}" in txt and id_comment is None:
             id_comment = slide["objectId"]
-    return id_main, id_comment
+        if "{{TITLE_SUMMARY}}" in txt and id_summary is None:
+            id_summary = slide["objectId"]
+    return id_main, id_comment, id_summary
 
 
 def cari_template_slide_endweek(presentation):
@@ -516,9 +519,11 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
     link_presentasi = f"https://docs.google.com/presentation/d/{id_slide_baru}/edit"
 
     presentation = slides_service.presentations().get(presentationId=id_slide_baru).execute()
-    id_templat_main, id_templat_comment = cari_template_slide(presentation)
+    id_templat_main, id_templat_comment, id_templat_summary = cari_template_slide(presentation)
     if not id_templat_main:
         raise Exception("Template Midweek tidak ditemukan! Pastikan ada slide berisi placeholder '{{IMG}}'.")
+
+    all_titles = []
 
     slide_count = len(presentation.get("slides", []))
     jumlah = len(censored_items)
@@ -553,6 +558,7 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
                 insight_midweek = "-"
 
             sheets_append_data.append([week_range, judul, konteks])
+            all_titles.append(judul)
 
             link_gambar_main = upload_pil_ke_drive(drive_service, item["img_main_pil"], fname)
             link_gambar_comment = None
@@ -606,6 +612,23 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
             status_box.error(f"{fname} dilewati: {e}")
         finally:
             progress_bar.progress((index + 1) / jumlah)
+
+    if id_templat_summary and all_titles:
+        try:
+            status_box.info("Mengisi ringkasan judul di slide cover...")
+            ringkasan_judul = "\n".join(all_titles)
+            slides_service.presentations().batchUpdate(
+                presentationId=id_slide_baru,
+                body={"requests": [
+                    {"replaceAllText": {
+                        "containsText": {"text": "{{TITLE_SUMMARY}}"},
+                        "replaceText": ringkasan_judul,
+                        "pageObjectIds": [id_templat_summary],
+                    }}
+                ]},
+            ).execute()
+        except Exception as summary_err:
+            status_box.error(f"Gagal mengisi ringkasan judul di cover slide: {summary_err}")
 
     if sheets_append_data:
         try:
