@@ -449,6 +449,31 @@ Output Format:
 """
 
 
+PROMPT_SUMMARY = """
+Below are the Context and Insight already written for a research slide about a rider-related social media post.
+
+Context: {konteks}
+Insight: {insight}
+
+Task: Write ONE short summary that synthesizes the core point of the Context and Insight above, in 1-2 sentences maximum, in English.
+Do not simply copy sentences from the Context or Insight; combine and condense them into a fresh, standalone summary.
+Do not use generic openers such as "This shows...", "This highlights...", "Overall...", "In summary...". Go straight to the point.
+Output ONLY the summary text, with no labels, quotes, or markdown.
+"""
+
+
+def buat_summary_slide(model_fallback_list, konteks, insight_teks, status_box):
+    """Combine Context + Insight into a short 1-2 sentence slide summary via Gemini. Falls back to Context on failure."""
+    insight_bersih = insight_teks.strip() if insight_teks and insight_teks.strip() not in ("", "-") else konteks
+    prompt_summary = PROMPT_SUMMARY.format(konteks=konteks, insight=insight_bersih)
+    try:
+        teks_summary, _ = panggil_gemini_fallback(model_fallback_list, prompt_summary, [], status_box)
+        return teks_summary.strip()
+    except Exception as e:
+        status_box.warning(f"Failed to generate slide Summary, falling back to Context: {e}")
+        return konteks
+
+
 def upload_pil_ke_drive(drive_service, pil_image, filename):
     """Upload a PIL image (already censored) to Drive as PNG, return the public link."""
     buf = io.BytesIO()
@@ -560,6 +585,8 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
             sheets_append_data.append([week_range, judul, konteks])
             all_titles.append(judul)
 
+            ringkasan_summary = buat_summary_slide(model_fallback_list, konteks, insight_midweek, status_box)
+
             link_gambar_main = upload_pil_ke_drive(drive_service, item["img_main_pil"], fname)
             link_gambar_comment = None
             if item.get("img_cmt_pil") is not None:
@@ -570,6 +597,7 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
                 "title": judul,
                 "context": konteks,
                 "insight_list": insight_list,
+                "summary": ringkasan_summary,
                 "img_main": link_gambar_main,
                 "img_cmt": link_gambar_comment,
             })
@@ -585,6 +613,7 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
                 {"replaceAllText": {"containsText": {"text": "{{TITLE}}"}, "replaceText": judul, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllText": {"containsText": {"text": "{{CONTEXT}}"}, "replaceText": konteks, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllText": {"containsText": {"text": "{{INSIGHT}}"}, "replaceText": insight_midweek, "pageObjectIds": [id_baru_main]}},
+                {"replaceAllText": {"containsText": {"text": "{{Summary}}"}, "replaceText": ringkasan_summary, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllShapesWithImage": {"imageUrl": link_gambar_main, "replaceMethod": "CENTER_INSIDE", "containsText": {"text": "{{IMG}}", "matchCase": True}, "pageObjectIds": [id_baru_main]}},
             ]
             slides_service.presentations().batchUpdate(presentationId=id_slide_baru, body={"requests": req_main}).execute()
@@ -673,6 +702,7 @@ def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
         judul, konteks = item["title"], item["context"]
         img_main, img_cmt = item["img_main"], item["img_cmt"]
         insight_endweek = " ".join(item["insight_list"])
+        ringkasan_summary = item.get("summary", konteks)
 
         if "Format 1" in format_pilihan:
             res_dup = slides_service.presentations().batchUpdate(
@@ -684,6 +714,7 @@ def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
                 {"replaceAllText": {"containsText": {"text": "{{TITLE}}"}, "replaceText": judul, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllText": {"containsText": {"text": "{{CONTEXT}}"}, "replaceText": konteks, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllText": {"containsText": {"text": "{{INSIGHT}}"}, "replaceText": insight_endweek, "pageObjectIds": [id_baru_main]}},
+                {"replaceAllText": {"containsText": {"text": "{{Summary}}"}, "replaceText": ringkasan_summary, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllShapesWithImage": {"imageUrl": img_main, "replaceMethod": "CENTER_INSIDE", "containsText": {"text": "{{IMG}}", "matchCase": True}, "pageObjectIds": [id_baru_main]}},
             ]
             slides_service.presentations().batchUpdate(presentationId=id_slide_baru, body={"requests": req_main}).execute()
@@ -711,6 +742,7 @@ def jalankan_otomatisasi_endweek(creds, processed_data, selections, status_box):
                 {"replaceAllText": {"containsText": {"text": "{{TITLE}}"}, "replaceText": judul, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllText": {"containsText": {"text": "{{CONTEXT}}"}, "replaceText": konteks, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllText": {"containsText": {"text": "{{INSIGHT}}"}, "replaceText": insight_endweek, "pageObjectIds": [id_baru_main]}},
+                {"replaceAllText": {"containsText": {"text": "{{Summary}}"}, "replaceText": ringkasan_summary, "pageObjectIds": [id_baru_main]}},
                 {"replaceAllShapesWithImage": {"imageUrl": img_main, "replaceMethod": "CENTER_INSIDE", "containsText": {"text": "{{IMG}}", "matchCase": True}, "pageObjectIds": [id_baru_main]}},
             ]
             slides_service.presentations().batchUpdate(presentationId=id_slide_baru, body={"requests": req_main}).execute()
