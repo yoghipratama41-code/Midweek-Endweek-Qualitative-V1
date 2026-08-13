@@ -440,11 +440,11 @@ Strict Rules:
 2. Do NOT mention any social media usernames, account names, or the image filename.
 3. You MAY mention the name of the gig/delivery platform (e.g. Grab, Foodpanda, Lalamove, etc.) if it is visibly shown or referenced in the image or comments. Only usernames, handles, and filenames are off-limits — platform names are allowed and encouraged when relevant.
 4. Never begin the paragraph with a generic opener such as "This image...", "This discussion...", "The illustration...", "This conversation...", or any variant that refers to "the image" or "the illustration" itself. Do not describe the fact that you are looking at an image at all. Instead, dive straight into the substance: open with the rider's situation, the specific complaint or sentiment, the operational issue, a concrete detail, or the context of the exchange. Vary the opening construction from one slide to the next (e.g. start with a cause, a location, a time reference, a rider's action, or a direct statement of the issue) so that consecutive outputs do not read as templated or repetitive.
-5. The paragraph must consist of at least 3-4 sentences.
+5. The paragraph must consist of exactly 3 sentences: the first sentence serves as the Context, and the following 2 sentences serve as two distinct Insight points (do not merge them into one sentence, and do not add a 4th sentence).
 
 Output Format:
-[TITLE] Write a long, specific, headline-style title, roughly 12-18 words, that reads like a mini research-slide headline capturing the core theme plus a specific supporting detail (not a short generic label). For reference, match this style and length:
-"Cross-Region Operational Challenges: Detailed Suggestion from Community Regarding Working on a Different Zone Registered"
+[TITLE] Write a specific, headline-style title, roughly 9-15 words, that reads like a mini research-slide headline capturing the core theme plus a specific supporting detail (not a short generic label). For reference, match this style and length:
+"Cross-Region Operational Challenges: Suggestion from Community on Working a Different Zone"
 [CONTENT] Write the full paragraph here.
 """
 
@@ -455,11 +455,40 @@ Below are the Context and Insight already written for a research slide about a r
 Context: {konteks}
 Insight: {insight}
 
-Task: Write ONE short summary that synthesizes the core point of the Context and Insight above, in 1-2 sentences maximum, in English.
-Do not simply copy sentences from the Context or Insight; combine and condense them into a fresh, standalone summary.
-Do not use generic openers such as "This shows...", "This highlights...", "Overall...", "In summary...". Go straight to the point.
-Output ONLY the summary text, with no labels, quotes, or markdown.
+Task: Write ONE short Summary for this slide, in 1-2 sentences maximum, in English. Keep it strictly short: no more than 25 words total, so it fits inside a small text box on the slide. This Summary is a DIFFERENT field from the Context/Insight above and from what gets logged to the spreadsheet — it must add something on top of them, not restate them.
+
+Follow this priority order when deciding what the Summary should say:
+1. NEW FINDING: If the Context/Insight surfaces something beyond the obvious topic (a root cause, a pattern across riders, a consequence), state that new finding.
+2. ANSWER THE QUESTION: If the original post or comments posed a question, answer it directly and plainly.
+3. BOTH OF THE ABOVE MUST BE FACTUAL AND NUMBER-BACKED: whichever of the two above applies, ground it in a concrete count, ratio, or percentage (e.g. how many riders, how many comments, what share of feedback) rather than a vague qualifier like "several" or "many".
+4. FALLBACK: Only if there is no new finding to surface and no question to answer, describe the overall sentiment instead — but still anchor it with a number wherever the Context/Insight gives enough basis to estimate one.
+
+Style reference (match this tone, sentence structure, and use of numbers — do NOT copy this content):
+- "At least two riders explicitly mentioned that the tier system does not affect their incentives. This was further supported by some riders who explained that the tier system mainly affects the benefits they receive rather than their incentives."
+- "Backed by 50% of classified feedback (4 out of 8 comments), riders conclude that while bundled batches accelerate individual incentives, their disproportionately low payouts make equitable single-order distribution far more sustainable."
+- "Three riders explicitly criticized GrabExpress's strict cancellations and low fares, supported by five others."
+- "2 out of 3 comments agree that the cancellation affected multiple drivers at once, thus the suspected bug on the app is the main cause of this."
+
+Rules:
+- Do not simply copy or lightly reword sentences from the Context or Insight; synthesize a fresh, standalone Summary that goes beyond them.
+- Do not use generic openers such as "This shows...", "This highlights...", "Overall...", "In summary...". Go straight to the point.
+- Stay within 25 words total (roughly the length of the style-reference examples above) — this is a hard limit, not a suggestion.
+- Output ONLY the summary text, with no labels, quotes, or markdown.
 """
+
+
+SUMMARY_MAX_WORDS = 25
+
+
+def _potong_summary(teks, max_words=SUMMARY_MAX_WORDS):
+    """Hard-enforce the word cap in case the model ignores the length instruction."""
+    words = teks.strip().split()
+    if len(words) <= max_words:
+        return teks.strip()
+    dipotong = " ".join(words[:max_words]).rstrip(",;:")
+    if not dipotong.endswith((".", "!", "?")):
+        dipotong += "."
+    return dipotong
 
 
 def buat_summary_slide(model_fallback_list, konteks, insight_teks, status_box):
@@ -468,10 +497,10 @@ def buat_summary_slide(model_fallback_list, konteks, insight_teks, status_box):
     prompt_summary = PROMPT_SUMMARY.format(konteks=konteks, insight=insight_bersih)
     try:
         teks_summary, _ = panggil_gemini_fallback(model_fallback_list, prompt_summary, [], status_box)
-        return teks_summary.strip()
+        return _potong_summary(teks_summary)
     except Exception as e:
         status_box.warning(f"Failed to generate slide Summary, falling back to Context: {e}")
-        return konteks
+        return _potong_summary(konteks)
 
 
 def upload_pil_ke_drive(drive_service, pil_image, filename):
