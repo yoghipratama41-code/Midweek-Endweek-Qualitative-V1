@@ -457,6 +457,8 @@ Insight: {insight}
 
 Task: Write ONE short Summary for this slide, in 1-2 sentences maximum, in English. Keep it strictly short: no more than 25 words total, so it fits inside a small text box on the slide. This Summary is a DIFFERENT field from the Context/Insight above and from what gets logged to the spreadsheet — it must add something on top of them, not restate them.
 
+Tone: Stay strictly NEUTRAL and factual. Report what riders said/did and what the numbers show — do not editorialize, do not take a side, do not use judgment-loaded words (e.g. "unfortunately", "sadly", "clearly a problem", "great news"). State it as an observation, not an opinion.
+
 Follow this priority order when deciding what the Summary should say:
 1. NEW FINDING: If the Context/Insight surfaces something beyond the obvious topic (a root cause, a pattern across riders, a consequence), state that new finding.
 2. ANSWER THE QUESTION: If the original post or comments posed a question, answer it directly and plainly.
@@ -477,6 +479,22 @@ Rules:
 """
 
 
+PROMPT_SUMMARY_PROMO = """
+Below are the Context and Insight already written for a slide about a promotional image (e.g. a platform promo, campaign, or announcement banner) — NOT rider feedback or a social media discussion.
+
+Context: {konteks}
+Insight: {insight}
+
+Task: Write ONE short Summary for this slide, in 1-2 sentences maximum, in English, no more than 25 words total, so it fits inside a small text box on the slide.
+
+The Summary must simply and neutrally state what the promotion is about — e.g. what is being offered, to whom, and any key detail such as the timeframe, mechanic, or reward, if that detail is available in the Context/Insight. Do not analyze, evaluate, or speculate about impact or rider reaction; this is a promo, not feedback.
+
+Tone: Stay strictly NEUTRAL and factual, like a plain description — no promotional language of your own (avoid words like "exciting", "amazing", "don't miss out"), and no generic openers such as "This shows...", "This highlights...", "Overall...", "In summary...".
+
+Output ONLY the summary text, with no labels, quotes, or markdown.
+"""
+
+
 SUMMARY_MAX_WORDS = 25
 
 
@@ -491,10 +509,11 @@ def _potong_summary(teks, max_words=SUMMARY_MAX_WORDS):
     return dipotong
 
 
-def buat_summary_slide(model_fallback_list, konteks, insight_teks, status_box):
+def buat_summary_slide(model_fallback_list, konteks, insight_teks, status_box, is_promo=False):
     """Combine Context + Insight into a short 1-2 sentence slide summary via Gemini. Falls back to Context on failure."""
     insight_bersih = insight_teks.strip() if insight_teks and insight_teks.strip() not in ("", "-") else konteks
-    prompt_summary = PROMPT_SUMMARY.format(konteks=konteks, insight=insight_bersih)
+    template_prompt = PROMPT_SUMMARY_PROMO if is_promo else PROMPT_SUMMARY
+    prompt_summary = template_prompt.format(konteks=konteks, insight=insight_bersih)
     try:
         teks_summary, _ = panggil_gemini_fallback(model_fallback_list, prompt_summary, [], status_box)
         return _potong_summary(teks_summary)
@@ -614,7 +633,9 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
             sheets_append_data.append([week_range, judul, konteks])
             all_titles.append(judul)
 
-            ringkasan_summary = buat_summary_slide(model_fallback_list, konteks, insight_midweek, status_box)
+            ringkasan_summary = buat_summary_slide(
+                model_fallback_list, konteks, insight_midweek, status_box, is_promo=item.get("is_promo", False)
+            )
 
             link_gambar_main = upload_pil_ke_drive(drive_service, item["img_main_pil"], fname)
             link_gambar_comment = None
@@ -927,7 +948,7 @@ if ada_yang_bisa_diproses and not butuh_sensor_dulu:
                     promo_items = []
                     for pf in (promo_files or []):
                         img_promo = PIL.Image.open(pf).convert("RGB")
-                        promo_items.append({"filename": pf.name, "img_main_pil": img_promo, "img_cmt_pil": None})
+                        promo_items.append({"filename": pf.name, "img_main_pil": img_promo, "img_cmt_pil": None, "is_promo": True})
 
                     semua_items = st.session_state.censored_items + promo_items
 
