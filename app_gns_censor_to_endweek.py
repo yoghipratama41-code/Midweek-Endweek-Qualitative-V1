@@ -460,16 +460,24 @@ Task: Write ONE short Summary for this slide, in 1-2 sentences maximum, in Engli
 Tone: Stay strictly NEUTRAL and factual. Report what riders said/did and what the numbers show — do not editorialize, do not take a side, do not use judgment-loaded words (e.g. "unfortunately", "sadly", "clearly a problem", "great news"). State it as an observation, not an opinion.
 
 Follow this priority order when deciding what the Summary should say:
-1. NEW FINDING: If the Context/Insight surfaces something beyond the obvious topic (a root cause, a pattern across riders, a consequence), state that new finding.
-2. ANSWER THE QUESTION: If the original post or comments posed a question, answer it directly and plainly.
-3. BOTH OF THE ABOVE MUST BE FACTUAL AND NUMBER-BACKED: whichever of the two above applies, ground it in a concrete count, ratio, or percentage (e.g. how many riders, how many comments, what share of feedback) rather than a vague qualifier like "several" or "many".
-4. FALLBACK: Only if there is no new finding to surface and no question to answer, describe the overall sentiment instead — but still anchor it with a number wherever the Context/Insight gives enough basis to estimate one.
 
-Style reference (match this tone, sentence structure, and use of numbers — do NOT copy this content):
-- "At least two riders explicitly mentioned that the tier system does not affect their incentives. This was further supported by some riders who explained that the tier system mainly affects the benefits they receive rather than their incentives."
-- "Backed by 50% of classified feedback (4 out of 8 comments), riders conclude that while bundled batches accelerate individual incentives, their disproportionately low payouts make equitable single-order distribution far more sustainable."
-- "Three riders explicitly criticized GrabExpress's strict cancellations and low fares, supported by five others."
-- "2 out of 3 comments agree that the cancellation affected multiple drivers at once, thus the suspected bug on the app is the main cause of this."
+1. NEW FINDING: If the Context/Insight surfaces something beyond the obvious topic (a root cause, a pattern across riders, a consequence), state that new finding.
+2. ANSWER THE QUESTION: If the original post posed a question, answer it directly and plainly.
+3. EVIDENCE-BASED NUMBERS ONLY (NO HALLUCINATIONS): If you include a count, ratio, or percentage (e.g., "50%"), it must be explicitly provable from the provided text (e.g., "4 out of 8 riders"). Never invent, estimate, or hallucinate numbers.
+4. QUALITATIVE FALLBACK: If the source data does not provide enough evidence to calculate exact numbers, do not force them. Instead, provide additional contextual insights based on the post, or describe the overall sentiment without making up percentages.
+
+CRITICAL RULE - TERMINOLOGY:
+Always refer to the individuals as "riders". Never use terms like "commenters", "comments", "users", or "posters" (e.g., say "2 out of 3 riders agree", not "2 out of 3 comments agree").
+
+Style reference (match this tone, sentence structure, and evidence-based framing — do NOT copy this content):
+
+1. "At least two riders explicitly mentioned that the tier system does not affect their incentives. This was further supported by some riders who explained that the tier system mainly affects the benefits they receive rather than their incentives."
+
+2. "Backed by 50% of the feedback (4 out of 8 riders), riders conclude that while bundled batches accelerate individual incentives, their disproportionately low payouts make equitable single-order distribution far more sustainable."
+
+3. "Three riders explicitly criticized GrabExpress's strict cancellations and low fares, supported by five others."
+
+4. "2 out of 3 riders agree that the cancellation affected multiple drivers at once, thus the suspected bug on the app is the main cause of this."
 
 Rules:
 - Do not simply copy or lightly reword sentences from the Context or Insight; synthesize a fresh, standalone Summary that goes beyond them.
