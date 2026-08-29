@@ -462,22 +462,30 @@ Tone: Stay strictly NEUTRAL and factual. Report what riders said/did and what th
 Follow this priority order when deciding what the Summary should say:
 
 1. NEW FINDING: If the Context/Insight surfaces something beyond the obvious topic (a root cause, a pattern across riders, a consequence), state that new finding.
+
 2. ANSWER THE QUESTION: If the original post posed a question, answer it directly and plainly.
+
 3. EVIDENCE-BASED NUMBERS ONLY (NO HALLUCINATIONS): If you include a count, ratio, or percentage (e.g., "50%"), it must be explicitly provable from the provided text (e.g., "4 out of 8 riders"). Never invent, estimate, or hallucinate numbers.
-4. QUALITATIVE FALLBACK: If the source data does not provide enough evidence to calculate exact numbers, do not force them. Instead, provide additional contextual insights based on the post, or describe the overall sentiment without making up percentages.
 
-CRITICAL RULE - TERMINOLOGY:
-Always refer to the individuals as "riders". Never use terms like "commenters", "comments", "users", or "posters" (e.g., say "2 out of 3 riders agree", not "2 out of 3 comments agree").
+4. STRAIGHTFORWARD INSIGHT (IF NO NUMBERS): If there are no numbers to use, state the core problem and the main takeaway directly and plainly. Do not beat around the bush or abstract the issue. Add a clear, practical insight based on the context of the post.
 
-Style reference (match this tone, sentence structure, and evidence-based framing — do NOT copy this content):
+CRITICAL RULES FOR LANGUAGE & TONE:
 
-1. "At least two riders explicitly mentioned that the tier system does not affect their incentives. This was further supported by some riders who explained that the tier system mainly affects the benefits they receive rather than their incentives."
+• NO CORPORATE JARGON: Write in simple, straightforward, and plain language. Never use overly academic or corporate terms (e.g., avoid "operational workaround", "persistent platform bugs", or "significant downtime"). Instead, use real, everyday terms (e.g., "switching phones", "app glitch", or "wasting time").
 
-2. "Backed by 50% of the feedback (4 out of 8 riders), riders conclude that while bundled batches accelerate individual incentives, their disproportionately low payouts make equitable single-order distribution far more sustainable."
+• ONLY USE "RIDERS": Always refer to the individuals as "riders". Never use terms like "commenters", "comments", "users", or "posters".
 
-3. "Three riders explicitly criticized GrabExpress's strict cancellations and low fares, supported by five others."
+Style reference for NO NUMBERS (Direct & Simple):
 
-4. "2 out of 3 riders agree that the cancellation affected multiple drivers at once, thus the suspected bug on the app is the main cause of this."
+• BAD (Too much jargon): "Riders report that device switching is a necessary operational workaround to bypass persistent platform bugs that prevent the resumption of work."
+
+• GOOD (Straightforward): "Riders are experiencing an app glitch that prevents them from resuming jobs after a delivery. Because reinstalling the app doesn't work, other riders suggest logging in from a second phone to fix the issue."
+
+Style reference for WITH NUMBERS (Direct & Simple):
+
+• "At least two riders explicitly mentioned that the tier system does not affect their incentives. This was further supported by others who explained that the tier system mainly affects their benefits."
+
+• "3 out of 5 riders agree that GrabExpress's strict cancellations and low fares are the main issues."
 
 Rules:
 - Do not simply copy or lightly reword sentences from the Context or Insight; synthesize a fresh, standalone Summary that goes beyond them.
