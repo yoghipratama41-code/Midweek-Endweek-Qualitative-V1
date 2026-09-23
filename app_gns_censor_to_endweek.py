@@ -112,7 +112,7 @@ hr {
 
 /* ---------- Buttons ---------- */
 .stButton > button, .stDownloadButton > button {
-    border-radius: 2px !important; /* Sharp corners, no gradients */
+    border-radius: 2px !important;
     font-weight: 600 !important;
     transition: all 0.2s ease;
     background-color: var(--orange) !important;
@@ -163,7 +163,7 @@ hr {
     color: var(--bg-dark) !important;
 }
 
-/* ---------- Sliders (handle + filled track) ---------- */
+/* ---------- Sliders ---------- */
 div[data-baseweb="slider"] div[role="slider"] {
     background-color: var(--orange) !important;
     border-color: var(--orange) !important;
@@ -182,7 +182,7 @@ label[data-baseweb="checkbox"] div:first-child {
     border-color: var(--orange) !important;
 }
 
-/* ---------- Alerts (Info/Success/Error/Warning) ---------- */
+/* ---------- Alerts ---------- */
 div[data-testid="stAlert"] {
     border-radius: 2px !important;
     border: 1px solid var(--orange) !important;
@@ -191,7 +191,6 @@ div[data-testid="stAlert"] {
 div[data-testid="stAlert"] p {
     color: var(--white) !important;
 }
-/* Force hide alert icons (emotes) generated natively by Streamlit */
 div[data-testid="stAlert"] span[role="img"] {
     display: none !important;
 }
@@ -220,13 +219,11 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     box-shadow: none !important;
 }
 
-/* ---------- Links ---------- */
+/* ---------- Links & Captions ---------- */
 a {
     color: var(--orange) !important;
     font-weight: 600;
 }
-
-/* ---------- Captions ---------- */
 .stCaption, [data-testid="stCaptionContainer"] {
     color: var(--text-muted) !important;
 }
@@ -286,7 +283,6 @@ def load_ocr_reader():
 
 # ==========================================
 # 2. GEMINI - SINGLE FALLBACK FUNCTION USED FOR ALL AI CALLS
-#    (name identification for censoring, AND title/context/insight analysis)
 # ==========================================
 def get_model_fallback_list():
     available = [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]
@@ -300,8 +296,11 @@ def get_model_fallback_list():
     return ordered
 
 
-def panggil_gemini_fallback(model_names, prompt, gambar_list, status_box, max_retry_per_model=MAX_RETRY_PER_MODEL):
-    """Send prompt+images to Gemini. Retry with backoff on rate limit, switch model if it keeps failing."""
+def panggil_gemini_fallback(model_names, prompt, gambar_list, status_box, max_retry_per_model=MAX_RETRY_PER_MODEL, parser_func=None):
+    """
+    Send prompt+images to Gemini. Retry with backoff on API rate limit. 
+    If a parser_func is provided and fails to extract (bad format), immediately fallback to the next model.
+    """
     last_err = None
     for model_name in model_names:
         model = genai.GenerativeModel(model_name)
@@ -312,10 +311,19 @@ def panggil_gemini_fallback(model_names, prompt, gambar_list, status_box, max_re
             try:
                 time.sleep(2)
                 respon = model.generate_content([prompt] + gambar_list)
-                return respon.text, nama_model_pendek
+                text_result = respon.text
+                
+                # Try formatting/extracting the response using the provided parser
+                if parser_func:
+                    parsed_result = parser_func(text_result)
+                    return parsed_result, nama_model_pendek
+                else:
+                    return text_result, nama_model_pendek
+
             except Exception as e:
                 err_msg = str(e)
                 last_err = e
+                # Check if the failure is a Google API limit
                 if "429" in err_msg or "503" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
                     wait_time = delay + random.uniform(0, 5)
                     status_box.warning(
@@ -325,14 +333,17 @@ def panggil_gemini_fallback(model_names, prompt, gambar_list, status_box, max_re
                     time.sleep(wait_time)
                     delay *= 2
                 else:
-                    status_box.warning(f"Model **{nama_model_pendek}** error: {err_msg[:150]}")
-                    break
+                    # If it's a parsing/extraction error (JSON decode, missing tags) or unrecoverable API error
+                    status_box.warning(f"Model **{nama_model_pendek}** failed to extract/format: {err_msg[:100]}")
+                    break # Break out of the retry loop for this model, and move to the next model in the list
+                    
         status_box.info(f"Switching from model **{nama_model_pendek}** to the next model...")
-    raise Exception(f"All models failed. Last error: {last_err}")
+        
+    raise Exception(f"All models failed to respond or extract data. Last error: {last_err}")
 
 
 # ==========================================
-# 3. CENSOR STAGE (Gemini identifies names + EasyOCR finds pixel location)
+# 3. CENSOR STAGE
 # ==========================================
 AIM_PROMPT = """
 Analyze this social media screenshot (it could be a main post, a caption, OR a comment).
@@ -410,9 +421,18 @@ def apply_censor_pixel_boxes(image_pil, boxes, pad_ukuran, offset_y):
 def sensor_satu_gambar(uploaded_file, model_fallback_list, reader, match_threshold, pad_ukuran, offset_y, status_box):
     """Run the censor pipeline for a single uploaded file, return (original_image, censored_image, name_list, unmatched_names)."""
     image = PIL.Image.open(uploaded_file).convert("RGB")
-    response_text, model_dipakai = panggil_gemini_fallback(model_fallback_list, AIM_PROMPT, [image], status_box)
-    json_clean = response_text.replace("```json", "").replace("```", "").strip()
-    name_list = json.loads(json_clean)
+    
+    # Custom parser to validate JSON extraction. 
+    # If this fails, the fallback loop will catch the error and try the next model.
+    def parse_censor_json(text):
+        json_clean = text.replace("```json", "").replace("```", "").strip()
+        if not (json_clean.startswith("[") and json_clean.endswith("]")):
+            raise ValueError("Response is not a valid JSON array format.")
+        return json.loads(json_clean)
+
+    name_list, model_dipakai = panggil_gemini_fallback(
+        model_fallback_list, AIM_PROMPT, [image], status_box, parser_func=parse_censor_json
+    )
 
     ocr_results = run_ocr(image, reader)
     used_indices = set()
@@ -429,7 +449,7 @@ def sensor_satu_gambar(uploaded_file, model_fallback_list, reader, match_thresho
 
 
 # ==========================================
-# 4. ENDWEEK STAGE (AI analysis on already-censored images + Drive upload + slide generation)
+# 4. ENDWEEK STAGE
 # ==========================================
 PROMPT_ANALISIS = """
 Analyze this image (and comments if any) for a professional research slide.
@@ -629,12 +649,20 @@ def jalankan_otomatisasi_midweek_dari_sensor(creds, censored_items, week_range, 
             if item.get("img_cmt_pil") is not None:
                 gambar_list.append(item["img_cmt_pil"])
 
+            # Custom parser to validate tags [TITLE] and [CONTENT]
+            # If a model fails to format this way, the fallback loop handles it and switches to the next one
+            def parse_midweek(teks_raw):
+                if "[TITLE]" not in teks_raw or "[CONTENT]" not in teks_raw:
+                    raise ValueError("Model failed to output standard [TITLE] and [CONTENT] tags.")
+                judul = teks_raw.split("[TITLE]")[1].split("[CONTENT]")[0].strip()
+                full_para = teks_raw.split("[CONTENT]")[1].strip()
+                return judul, full_para
+
             prompt_ai = PROMPT_ANALISIS
-            teks_raw, model_dipakai = panggil_gemini_fallback(
-                model_fallback_list, prompt_ai, gambar_list, status_box
+            (judul, full_para), model_dipakai = panggil_gemini_fallback(
+                model_fallback_list, prompt_ai, gambar_list, status_box, parser_func=parse_midweek
             )
-            judul = teks_raw.split("[TITLE]")[1].split("[CONTENT]")[0].strip()
-            full_para = teks_raw.split("[CONTENT]")[1].strip()
+            
             sentences = re.split(r"(?<=[.!?]) +", full_para)
 
             if len(sentences) > 1:
@@ -916,7 +944,7 @@ if news_items:
 
         st.session_state.censored_items = censored_items
         st.session_state.censor_done = True
-        st.session_state.approved = False  # reset approval if censor is run again
+        st.session_state.approved = False
         st.session_state.midweek_link = ""
         st.session_state.processed_data = []
         st.success("Censoring complete. Check the results below before continuing to Endweek.")
